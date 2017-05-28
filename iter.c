@@ -6,18 +6,21 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#include <math.h>
 
-static double array[2048][2048];
-//static double results[2048][2048];
+static double array[2049][2049];
+static double results[2049][2049];
+static double dif = 0.0002;
 int openInput();
+void calcJacobi();
 int main(){
   int result = openInput();
   if(result < 0){
     return 127;
   }
-  for(int i = 0; i < 2048; i ++){
-    printf("%lf\n", array[0][i]);
-  }
+  calcJacobi();
+  printf("%f\n", dif);
+
   return 0;
 }
 
@@ -49,4 +52,30 @@ int openInput(){
     ix ++;
   }
   return 0;
+}
+void calcJacobi(){
+  while(1){
+    for(int i = 1; i < 2048; i ++){
+      for(int j = 1; j < 2048; j ++){
+        results[i][j] = (array[i - 1][j] + array[i + 1][j] + array[i][j - 1] + array[i][j + 1]) * .25;
+      }
+    }
+    dif = 0.0;
+    for(int i = 1; i < 2048; i ++){
+      for(int j = 1; j < 2048; j ++){
+        if(dif < fabs(array[i][j] - results[i][j])){
+          dif = fabs(array[i][j] - results[i][j]);
+        }
+      }
+    }
+    if(dif < .0001){
+      break;
+    }
+    printf("%f\n", dif);
+    for(int i = 1; i < 2048; i ++){
+      for (int j = 1; j < 2048; j ++){
+        array[i][j] = results[i][j];
+      }
+    }
+  }
 }
