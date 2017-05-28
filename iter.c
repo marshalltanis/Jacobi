@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
+#include <string.h>
 
 static double array[2048][2048];
 //static double results[2048][2048];
@@ -13,6 +14,9 @@ int main(){
   int result = openInput();
   if(result < 0){
     return 127;
+  }
+  for(int i = 0; i < 2048; i ++){
+    printf("%lf\n", array[0][i]);
   }
   return 0;
 }
@@ -24,6 +28,7 @@ int openInput(){
     perror("fgets");
     return -1;
   }
+  path[strlen(path) -1]= '\0';
   FILE *input = fopen(path, "r");
   if(input == NULL){
     perror("fopen");
