@@ -11,32 +11,44 @@
 static double array[2049][2049];
 static double results[2049][2049];
 static double dif = 0.0002;
+
 int openInput();
 void calcJacobi();
+int getNumThreads();
+
 int main(){
+
   int result = openInput();
   if(result < 0){
     return 127;
   }
+
+  int numThreads = getNumThreads();
+  if (numThreads < 1){
+    dprintf(2, "Please enter a valid number of threads\n");
+    return 127;
+  }
+
   calcJacobi();
   printf("%f\n", dif);
 
   return 0;
 }
 
+int getNumThreads(){
+  int numThreads = 0;
+  printf("Please enter the number of threads: ");
+  scanf("%d", &numThreads);
+  return numThreads;
+}
+
 int openInput(){
-  char path[200];
-  printf("%s: ", "Please enter the input file name");
-  if(fgets(path, 200, stdin) == NULL){
-    perror("fgets");
-    return -1;
-  }
-  path[strlen(path) -1]= '\0';
-  FILE *input = fopen(path, "r");
+  FILE *input = fopen("/home/clausoa/public/input.mtx", "r");
   if(input == NULL){
     perror("fopen");
     return -1;
   }
+
   int ix = 0;
   while(ix < 2048){
     for(int i = 0; i < 2048; i ++){
@@ -53,6 +65,7 @@ int openInput(){
   }
   return 0;
 }
+
 void calcJacobi(){
   while(1){
     for(int i = 1; i < 2048; i ++){
