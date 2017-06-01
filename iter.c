@@ -9,9 +9,15 @@
 #include <math.h>
 #include <pthread.h>
 
-static double array[2049][2049];
-static double results[2049][2049];
+#define ROWS 2046
+#define COLUMNS 2046
+#define EPSILON .00005
+#define BOUNDARY 2048
+
+static double array[BOUNDARY][BOUNDARY];
+static double results[ROWS][COLUMNS];
 static double dif = 0.0002;
+static double *diffArray;
 
 struct thd {
   int who;
@@ -19,7 +25,7 @@ struct thd {
 };
 
 int openInput();
-void calcJacobi();
+void *calcJacobi(void *thdst);
 int getNumThreads();
 
 int main(){
@@ -34,21 +40,20 @@ int main(){
     dprintf(2, "Please enter a valid number of threads\n");
     return 127;
   }
+  diffArray = malloc(sizeof(double) * numThreads);
 
   pthread_t threads[numThreads];
   struct thd thdst[numThreads];
-  int diffArray[numThreads];
 
   for (int i = 0; i < numThreads; i++) {
     thdst[i].who = i;
     thdst[i].numThreads = numThreads;
     pthread_create(&threads[i], NULL, &calcJacobi, (void *)&thdst[i]);
+
   }
-  
-  calcJacobi();
   printf("%f\n", dif);
-  for(int i = 0; i < 2048; i ++){
-    for (int j = 0; j < 2048; j ++){
+  for(int i = 0; i < ROWS; i ++){
+    for (int j = 0; j < COLUMNS; j ++){
       printf("%lf ", array[i][j]);
     }
   }
@@ -72,8 +77,8 @@ int openInput(){
   }
 
   int ix = 0;
-  while(ix < 2048){
-    for(int i = 0; i < 2048; i ++){
+  while(ix < BOUNDARY){
+    for(int i = 0; i < BOUNDARY; i ++){
       errno = 0;
       int n = fscanf(input, "%lf", &array[ix][i]);
       if(n == 0){
@@ -88,32 +93,50 @@ int openInput(){
   return 0;
 }
 
-void calcJacobi(){
+void *calcJacobi(void *thisthread){
+  int converged = 0;
+  struct thd *t = (struct thd *)thisthread;
+  int start = 0;
+  int end = 0;
 
-  while(1){
-    for(int i = 1; i < 2048; i ++){
-      for(int j = 1; j < 2048; j ++){
-        /* value = (top + bottom + left + right) * .25 */
-        results[i][j] = (array[i - 1][j] + array[i + 1][j] + array[i][j - 1] + array[i][j + 1]) * .25;
+  start = 1 + ((t->who * COLUMNS)/t->numThreads);
+  end = 1 + (((t->who + 1) * COLUMNS)/t->numThreads);
+
+  while(!converged)
+  {
+    for(int i = 1; i <= ROWS; i ++)
+    {
+      for(int j = start; j <= end; j ++)
+      {
+        results[i][j] = (array[i - 1][j] + array[i + 1][j] +
+                        array[i][j - 1] + array[i][j + 1]) * .25;
       }
     }
 
     dif = 0.0;
-    for(int i = 1; i < 2048; i ++){
-      for(int j = 1; j < 2048; j ++){
+    for(int i = 1; i < ROWS; i ++){
+      for(int j = start; j <= end; j ++){
         if(dif < fabs(array[i][j] - results[i][j])){
           dif = fabs(array[i][j] - results[i][j]);
         }
       }
     }
-    if(dif < .00005){
-      break;
+    int numConverged = 0;
+    for (int i = 0; i < t->numThreads; i++) {
+      if (diffArray[i] <= EPSILON) {
+        numConverged = numConverged + 1;
+      }
     }
-    printf("%f\n", dif);
-    for(int i = 1; i < 2048; i ++){
-      for (int j = 1; j < 2048; j ++){
+    if (numConverged == t->numThreads)
+      converged = !converged;
+
+    //printf("%f\n", dif);
+    //syncronize
+    for(int i = 1; i < ROWS; i ++){
+      for (int j = 1; j < COLUMNS; j ++){
         array[i][j] = results[i][j];
       }
     }
   }
+  return 0;
 }
