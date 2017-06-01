@@ -7,10 +7,16 @@
 #include <errno.h>
 #include <string.h>
 #include <math.h>
+#include <pthread.h>
 
 static double array[2049][2049];
 static double results[2049][2049];
 static double dif = 0.0002;
+
+struct thd {
+  int who;
+  int numThreads;
+};
 
 int openInput();
 void calcJacobi();
@@ -29,8 +35,24 @@ int main(){
     return 127;
   }
 
+  pthread_t threads[numThreads];
+  struct thd thdst[numThreads];
+  int diffArray[numThreads];
+
+  for (int i = 0; i < numThreads; i++) {
+    thdst[i].who = i;
+    thdst[i].numThreads = numThreads;
+    pthread_create(&threads[i], NULL, &calcJacobi, (void *)&thdst[i]);
+  }
+  
   calcJacobi();
   printf("%f\n", dif);
+  for(int i = 0; i < 2048; i ++){
+    for (int j = 0; j < 2048; j ++){
+      printf("%lf ", array[i][j]);
+    }
+  }
+  printf("\n");
 
   return 0;
 }
@@ -67,12 +89,15 @@ int openInput(){
 }
 
 void calcJacobi(){
+
   while(1){
     for(int i = 1; i < 2048; i ++){
       for(int j = 1; j < 2048; j ++){
+        /* value = (top + bottom + left + right) * .25 */
         results[i][j] = (array[i - 1][j] + array[i + 1][j] + array[i][j - 1] + array[i][j + 1]) * .25;
       }
     }
+
     dif = 0.0;
     for(int i = 1; i < 2048; i ++){
       for(int j = 1; j < 2048; j ++){
@@ -81,7 +106,7 @@ void calcJacobi(){
         }
       }
     }
-    if(dif < .0001){
+    if(dif < .00005){
       break;
     }
     printf("%f\n", dif);
