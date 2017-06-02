@@ -12,7 +12,7 @@
 
 #define ROWS 2046
 #define COLUMNS 2046
-#define EPSILON .00005
+#define EPSILON .0001
 #define BOUNDARY 2048
 
 static double array[BOUNDARY][BOUNDARY];
@@ -20,7 +20,8 @@ static double results[BOUNDARY][BOUNDARY];
 static double dif = 0.0002;
 static double *diffArray;
 static int numHere = 0;
-static int iter = 0;
+static int converged = 0;
+
 
 struct thd {
   int who;
@@ -67,16 +68,6 @@ int main(){
   for (int i = 0; i < numThreads; i++) {
     pthread_join(threads[i], NULL);
   }
-  // printf("%f\n", dif);
-  // for(int i = 0; i < BOUNDARY; i ++){
-  //   for (int j = 0; j < BOUNDARY; j ++){
-  //     printf("%lf ", results[i][j]);
-  //   }
-  // }
-  // printf("\n");
-  // for(int i = 0; i < numThreads; i ++){
-  //   printf("%lf\n", diffArray[i]);
-  // }
   compareOut();
   return 0;
 }
@@ -118,9 +109,9 @@ void compareOut(){
   for(int i = 0; i < BOUNDARY; i ++){
     for(int j = 0; j < BOUNDARY; j ++){
       fscanf(his, "%lf", &hisD);
-      if(fabs(hisD - results[i][j]) > EPSILON){
+      if(fabs(hisD - array[i][j]) > EPSILON){
         count ++;
-        printf("his: %lf ours: %lf\n", hisD, results[i][j]);
+        printf("his: %lf ours: %lf {%d, %d}\n", hisD, array[i][j], i , j);
       }
     }
   }
@@ -154,27 +145,15 @@ void *calcJacobi(void *thisthread){
       }
     }
     diffArray[t->who] = difference;
-    int numConverged = 0;
-    for (int i = 0; i < t->numThreads; i++) {
-      if (diffArray[i] <= EPSILON) {
-        numConverged = numConverged + 1;
-      }
-    }
-    if (numConverged == t->numThreads)
-      break;
-
-    //printf("%f\n", dif);
     boundary(t);
-    //sleep(1);
-    //syncronize
     for(int i = start; i < end; i ++){
       for (int j = 1; j <= COLUMNS; j ++){
         array[i][j] = results[i][j];
       }
     }
-    sem_wait(&here);
-    //printf("%d\n", iter);
-    sem_post(&here);
+    if(diffArray[t->who] < EPSILON){
+      break;
+    }
   }
   return 0;
 }
@@ -188,7 +167,7 @@ void boundary(struct thd *t){
     return;
   }
   else{
-    for(int i = 0; i < t->numThreads; i ++){
+    for(int i = 0; i < t->numThreads - 1; i ++){
       sem_post(&wait);
     }
   }
