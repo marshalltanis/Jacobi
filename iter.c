@@ -20,12 +20,11 @@ static double results[BOUNDARY][BOUNDARY];
 static double dif = 0.0002;
 static double *diffArray;
 static int numHere = 0;
-static int converged = 0;
+static int numThreads = 0;
 
 
 struct thd {
   int who;
-  int numThreads;
 };
 
 static sem_t wait;
@@ -36,18 +35,17 @@ int openInput();
 void *calcJacobi(void *thdst);
 int getNumThreads();
 void boundary(struct thd *t);
-void compareOut();
+
 
 int main(){
 
   sem_init(&wait, 1, 0);
   sem_init(&here, 1, 1);
-  //pthread_mutex_init(&pointless, 0);
   int result = openInput();
   if(result < 0){
     return 127;
   }
-  int numThreads = getNumThreads();
+  numThreads = getNumThreads();
   if (numThreads < 1){
     dprintf(2, "Please enter a valid number of threads\n");
     return 127;
@@ -61,14 +59,12 @@ int main(){
 
   for (int i = 0; i < numThreads; i++) {
     thdst[i].who = i;
-    thdst[i].numThreads = numThreads;
     pthread_create(&threads[i], NULL, &calcJacobi, (void *)&thdst[i]);
   }
 
   for (int i = 0; i < numThreads; i++) {
     pthread_join(threads[i], NULL);
   }
-  compareOut();
   return 0;
 }
 
@@ -102,28 +98,13 @@ int openInput(){
   }
   return 0;
 }
-void compareOut(){
-  FILE *his = fopen("/home/clausoa/public/output.mtx", "r");
-  double hisD = 0.0;
-  int count = 0;
-  for(int i = 0; i < BOUNDARY; i ++){
-    for(int j = 0; j < BOUNDARY; j ++){
-      fscanf(his, "%lf", &hisD);
-      if(fabs(hisD - array[i][j]) > EPSILON){
-        count ++;
-        printf("his: %lf ours: %lf {%d, %d}\n", hisD, array[i][j], i , j);
-      }
-    }
-  }
-  printf("%d outside of epsilon\n", count);
-}
 void *calcJacobi(void *thisthread){
   struct thd *t = (struct thd *)thisthread;
   int start = 0;
   int end = 0;
 
-  start = 1 + (t->who * COLUMNS)/t->numThreads;
-  end = 1 + (((t->who + 1) * COLUMNS)/t->numThreads);
+  start = 1 + (t->who * COLUMNS)/numThreads;
+  end = 1 + (((t->who + 1) * COLUMNS)/numThreads);
   double difference = 0;
 
   while(1)
@@ -139,8 +120,8 @@ void *calcJacobi(void *thisthread){
     difference = 0.0;
     for(int i = start; i < end; i ++){
       for(int j = 1; j <= COLUMNS; j ++){
-        if(difference < fabs(array[i][j] - results[i][j])){
-          difference = fabs(array[i][j] - results[i][j]);
+        if(difference < fabs(results[i][j] - array[i][j])){
+          difference = fabs(results[i][j] - array[i][j]);
         }
       }
     }
@@ -152,7 +133,10 @@ void *calcJacobi(void *thisthread){
       }
     }
     if(diffArray[t->who] < EPSILON){
-      break;
+      sem_wait(&here);
+      numThreads --;
+      sem_post(&here);
+      pthread_exit(NULL);
     }
   }
   return 0;
@@ -161,13 +145,13 @@ void *calcJacobi(void *thisthread){
 void boundary(struct thd *t){
   sem_wait(&here);
   numHere ++;
-  if(numHere < t->numThreads){
+  if(numHere < numThreads){
     sem_post(&here);
     sem_wait(&wait);
     return;
   }
   else{
-    for(int i = 0; i < t->numThreads - 1; i ++){
+    for(int i = 0; i < numThreads - 1; i ++){
       sem_post(&wait);
     }
   }
